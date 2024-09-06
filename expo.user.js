@@ -1,7 +1,7 @@
 // ==UserScript==
-// @version     2024-09-06
-// @name        Oneshot expo
-// @namespace   http://tampermonkey.net/
+// @name         Oneshot expo
+// @namespace    http://tampermonkey.net/
+// @version      2024-09-06-01
 // @description  Adds buttons to send oneshot expeditions on the bottom of the fleet dispatch page
 // @author       n00b
 // @updateURL    https://raw.githubusercontent.com/Crypto89/ogame-oneshot-expeditions/main/expo.meta.js

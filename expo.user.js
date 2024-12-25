@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Oneshot expo
 // @namespace    http://tampermonkey.net/
-// @version      2024-09-06-01
+// @version      2024-12-25-01
 // @description  Adds buttons to send oneshot expeditions on the bottom of the fleet dispatch page
 // @author       n00b
 // @updateURL    https://raw.githubusercontent.com/Crypto89/ogame-oneshot-expeditions/main/expo.meta.js
@@ -10,7 +10,7 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=gameforge.com
 // ==/UserScript==
 
-const oseSendShips = (order, galaxy, system, planet, planettype, ships, additionalParams) => {
+const oseSendShips = (order, galaxy, system, planet, planettype, ships, additionalParams, callback) => {
     let params = { mission: order, galaxy: galaxy, system: system, position: planet, type: planettype, shipCount: 0, token: token }
 
     Object.keys(ships).forEach(function (shipId) {
@@ -35,12 +35,16 @@ const oseSendShips = (order, galaxy, system, planet, planettype, ships, addition
             updateOverlayToken('phalanxSystemDialog', data.newAjaxToken);
             updateOverlayToken('phalanxDialog', data.newAjaxToken);
             const status = (data.response.success) ? "success" : "error"
-            showNotification(data.response.message, status)
+            callback(data, status)
         }
     })
 }
 
-const sendExpedition = (offset) => {
+const showNotificationCallback = (data, status) => {
+    showNotification(data.response.message, status)
+}
+
+const sendExpedition = (offset, callback) => {
     return () => {
         if (expeditionCount == maxExpeditionCount) {
             showNotification("Already at maximum expeditions", "error")
@@ -91,25 +95,19 @@ const sendExpedition = (offset) => {
         }
 
         // oseSendShips
-        oseSendShips(15, cp.galaxy, system, 16, 1, expeditionFleetTemplate.ships, additionalParams)
+        oseSendShips(15, cp.galaxy, system, 16, 1, expeditionFleetTemplate.ships, additionalParams, callback)
     }
 }
 
-(function() {
-    'use strict';
-
-    const div = document.createElement("div");
-    div.style.display = 'table'
-    div.style.displayLayout = 'fixed'
-    div.style.width = "100%"
-
+const addRelativeButtons = () => {
+    const tr = document.createElement("tr")
     for (const offset of [-3, -2, -1, 0, 1, 2, 3]) {
         const button = document.createElement("button")
-        button.style.display = 'table-cell'
+        button.style.display = 'block'
+        button.style.margin = 'auto'
         button.style.textAlign = 'center'
-        button.style.fontSize = '24px'
-        button.style.marginLeft = '20px'
-        button.onclick = sendExpedition(offset)
+        button.style.fontSize = '32px'
+        button.onclick = sendExpedition(offset, showNotificationCallback)
 
         if (offset < 0) {
             button.textContent = '- ' + offset*-1
@@ -119,10 +117,84 @@ const sendExpedition = (offset) => {
             button.textContent = 'Inner'
         }
 
-        div.append(button)
+        const td = document.createElement("td")
+        td.style.paddingBottom = '10px'
+        td.append(button)
+        tr.append(td)
     }
 
-    document.querySelector("div#fleet1").append(div)
+    return tr
+}
+
+const findNextPlanet = () => {
+    const planets = document.querySelectorAll('#planetList > div')
+    const currentType = document.querySelector('meta[name="ogame-planet-type"]').attributes['content'].value
+
+    let nextLink = null
+
+    planets.forEach((planet, index) => {
+        const active = planet.querySelector('.active') != null
+        if (!active) return
+
+        const nextPlanet = planets[(index+1)%planets.length]
+
+        let next = nextPlanet.querySelector(`.${currentType}link`)
+        if (next == null) {
+            nextPlanet.querySelector(`.planetlink`)
+        }
+        nextLink = next.href
+    })
+
+    return nextLink
+}
+
+const nextPlanet = () => {
+    document.location.href = findNextPlanet()
+}
+
+const addQuickNext = () => {
+    const tr = document.createElement("tr")
+
+    const quick = document.createElement("button")
+    quick.style.display = 'block'
+    quick.style.margin = 'auto'
+    quick.style.textAlign = 'center'
+    quick.style.fontSize = '32px'
+    quick.onclick = sendExpedition(0, nextPlanet)
+    quick.textContent = 'Inner >>'
+    const quickTd = document.createElement("td")
+    quickTd.colSpan = 3
+    quickTd.append(quick)
+
+    const next = document.createElement("button")
+    next.style.display = 'block'
+    next.style.margin = 'auto'
+    next.style.textAlign = 'center'
+    next.style.fontSize = '24px'
+    next.onclick = nextPlanet
+    next.textContent = '>>'
+    const nextTd = document.createElement("td")
+    nextTd.colSpan = 3
+    nextTd.append(next)
+
+    const spacer = document.createElement("td")
+
+    tr.append(quickTd)
+    tr.append(spacer)
+    tr.append(nextTd)
+
+    return tr
+}
+
+(function() {
+    'use strict';
+
+    const table = document.createElement("table");
+    table.style.width = "100%"
+    table.append(addRelativeButtons());
+    table.append(addQuickNext());
+
+    document.querySelector("div#fleet1").append(table)
 
     document.onkeydown = (e) => {
         if (e.ctrlKey || e.altKey || e.metaKey) return;

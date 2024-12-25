@@ -1,5 +1,5 @@
 // ==UserScript==
 // @name         Oneshot expo
 // @namespace    http://tampermonkey.net/
-// @version      2024-09-06-01
+// @version      2024-12-25-01
 // ==/UserScript==

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Oneshot expo
 // @namespace    http://tampermonkey.net/
-// @version      2024-12-25-01
+// @version      2025-02-04-01
 // @description  Adds buttons to send oneshot expeditions on the bottom of the fleet dispatch page
 // @author       n00b
 // @updateURL    https://raw.githubusercontent.com/Crypto89/ogame-oneshot-expeditions/main/expo.meta.js
@@ -99,31 +99,44 @@ const sendExpedition = (offset, callback) => {
     }
 }
 
-const addRelativeButtons = () => {
-    const tr = document.createElement("tr")
-    for (const offset of [-3, -2, -1, 0, 1, 2, 3]) {
-        const button = document.createElement("button")
-        button.style.display = 'block'
-        button.style.margin = 'auto'
-        button.style.textAlign = 'center'
-        button.style.fontSize = '32px'
-        button.onclick = sendExpedition(offset, showNotificationCallback)
+const sendCollect = (callback) => {
+    return () => {
+        const totalRes = ['metal','crystal','deuterium'].
+        map(t => Math.floor(resourcesBar.resources[t].amount)).
+        reduce((a, b) => a+b, 0)
 
-        if (offset < 0) {
-            button.textContent = '- ' + offset*-1
-        } else if (offset > 0) {
-            button.textContent = '+ ' + offset
-        } else {
-            button.textContent = 'Inner'
-        }
+        const totalCargos = Math.ceil(totalRes / shipsData['203'].baseCargoCapacity)
+        console.log(totalRes, '=>', totalCargos)
 
-        const td = document.createElement("td")
-        td.style.paddingBottom = '10px'
-        td.append(button)
-        tr.append(td)
+        const cp = fleetDispatcher.currentPlanet
+
+        //
+        $.ajax(sendFleetUrl, {
+            data: {
+                am203: totalCargos,
+                mission: 3,
+                galaxy: cp.galaxy,
+                system: cp.system,
+                position: cp.position,
+                type: 3,
+                metal: Math.floor(resourcesBar.resources['metal'].amount),
+                crystal: Math.floor(resourcesBar.resources['crystal'].amount),
+                deuterium: Math.floor(resourcesBar.resources['deuterium'].amount),
+                speed: 10,
+                token: token
+            },
+            type: "POST",
+            success: (data) => {
+                const response = JSON.parse(data)
+                console.log(response);
+                token = response.newAjaxToken;
+                updateOverlayToken('phalanxSystemDialog', response.newAjaxToken);
+                updateOverlayToken('phalanxDialog', response.newAjaxToken);
+                const status = (response.success) ? "success" : "error"
+                callback(response.message, status)
+            }
+        })
     }
-
-    return tr
 }
 
 const findNextPlanet = () => {
@@ -152,6 +165,33 @@ const nextPlanet = () => {
     document.location.href = findNextPlanet()
 }
 
+const addRelativeButtons = () => {
+    const tr = document.createElement("tr")
+    for (const offset of [-3, -2, -1, 0, 1, 2, 3]) {
+        const button = document.createElement("button")
+        button.style.display = 'block'
+        button.style.margin = 'auto'
+        button.style.textAlign = 'center'
+        button.style.fontSize = '32px'
+        button.onclick = sendExpedition(offset, showNotificationCallback)
+
+        if (offset < 0) {
+            button.textContent = '- ' + offset*-1
+        } else if (offset > 0) {
+            button.textContent = '+ ' + offset
+        } else {
+            button.textContent = 'Inner'
+        }
+
+        const td = document.createElement("td")
+        td.style.paddingBottom = '10px'
+        td.append(button)
+        tr.append(td)
+    }
+
+    return tr
+}
+
 const addQuickNext = () => {
     const tr = document.createElement("tr")
 
@@ -163,6 +203,7 @@ const addQuickNext = () => {
     quick.onclick = sendExpedition(0, nextPlanet)
     quick.textContent = 'Inner >>'
     const quickTd = document.createElement("td")
+    quickTd.style.paddingBottom = '10px'
     quickTd.colSpan = 3
     quickTd.append(quick)
 
@@ -174,6 +215,7 @@ const addQuickNext = () => {
     next.onclick = nextPlanet
     next.textContent = '>>'
     const nextTd = document.createElement("td")
+    nextTd.style.paddingBottom = '10px'
     nextTd.colSpan = 3
     nextTd.append(next)
 
@@ -186,6 +228,41 @@ const addQuickNext = () => {
     return tr
 }
 
+const addQuickCollect = () => {
+    const tr = document.createElement('tr')
+    tr.style.marginTop = '4px'
+    const collect = document.createElement("button")
+    collect.style.display = 'block'
+    collect.style.margin = 'auto'
+    collect.style.textAlign = 'center'
+    collect.style.fontSize = '32px'
+    collect.onclick = sendCollect(showNotification)
+    collect.textContent = "Collect ︽"
+    const collectTd = document.createElement("td")
+    collectTd.colSpan = 3
+    collectTd.append(collect)
+
+    const spacer = document.createElement("td")
+
+    const collectNext = document.createElement("button")
+    collectNext.style.display = 'block'
+    collectNext.style.margin = 'auto'
+    collectNext.style.textAlign = 'center'
+    collectNext.style.fontSize = '32px'
+    collectNext.onclick = sendCollect(nextPlanet)
+    collectNext.textContent = "Collect ︽ >>"
+    const collectNextTd = document.createElement("td")
+    collectNextTd.colSpan = 3
+    collectNextTd.append(collectNext)
+
+
+    tr.append(collectTd)
+    tr.append(spacer)
+    tr.append(collectNextTd)
+
+    return tr
+}
+
 (function() {
     'use strict';
 
@@ -193,6 +270,7 @@ const addQuickNext = () => {
     table.style.width = "100%"
     table.append(addRelativeButtons());
     table.append(addQuickNext());
+    table.append(addQuickCollect());
 
     document.querySelector("div#fleet1").append(table)
 
